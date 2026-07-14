@@ -15,6 +15,8 @@ OOP Concepts Demonstrated:
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
+import os
+import csv
 from colorama import init, Fore, Style
 
 # initialise colorama – makes colors work on Windows too
@@ -28,13 +30,14 @@ init(autoreset=True)
 
 
 def print_header(text: str) -> None:
-    print(f"\n{Fore.GREEN}{'═' * 55}")
+    border = "=" * 55
+    print(f"\n{Fore.GREEN}{border}")
     print(f"  {text}")
-    print(f"{'═' * 55}{Style.RESET_ALL}")
+    print(f"{border}{Style.RESET_ALL}")
 
 
 def print_section(text: str) -> None:
-    print(f"\n{Fore.CYAN}  ── {text} ──{Style.RESET_ALL}")
+    print(f"\n{Fore.CYAN}  -- {text} --{Style.RESET_ALL}")
 
 
 def print_success(text: str) -> None:
@@ -410,7 +413,7 @@ class Clinic:
 
         print_section("Diagnosis & Treatment")
         if urgent:
-            print_urgent("  ⚠  URGENT case flagged by system based on symptoms!")
+            print_urgent("  ! URGENT case flagged by system based on symptoms!")
         print_info(f"  Assigned Doctor : Dr. {doctor.name} ({doctor.specialty})")
         print_info(f"  Diagnosis       : {service}")
 
@@ -427,6 +430,106 @@ class Clinic:
             print_urgent(str(bill))
         else:
             print_success(str(bill))
+
+# ─────────────────────────────────────────────────────────────────────────────
+# FILE I/O
+# save_data() – writes patients and appointments to CSV files on disk
+# load_data() – reads them back at startup so data is never lost
+# ─────────────────────────────────────────────────────────────────────────────
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PATIENTS_FILE = os.path.join(BASE_DIR, "patients.csv")
+APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
+
+
+def save_data(clinic: Clinic) -> None:
+    # save patients
+    with open(PATIENTS_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["id", "name", "age", "symptoms"])
+        for p in clinic.get_patients():
+            # list ["fever","cough"] → "fever|cough" to fit one CSV cell
+            writer.writerow([p.person_id, p.name, p.age, "|".join(p.get_symptoms())])
+
+    # save appointments
+    with open(APPOINTMENTS_FILE, "w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            [
+                "patient_id",
+                "doctor_id",
+                "doctor_name",
+                "doctor_specialty",
+                "time_slot",
+                "urgent",
+            ]
+        )
+        for a in clinic.appointments:
+            writer.writerow(
+                [
+                    a.patient.person_id,
+                    a.doctor.person_id,
+                    a.doctor.name,
+                    a.doctor.specialty,
+                    a.time_slot.strftime("%Y-%m-%d %H:%M"),
+                    a.urgent,
+                ]
+            )
+
+    print_success("\n  Records saved to patients.csv and appointments.csv")
+
+
+def load_data(clinic: Clinic) -> None:
+    if os.path.exists(PATIENTS_FILE):
+        existing_ids = {p.person_id for p in clinic.get_patients()}
+        with open(PATIENTS_FILE, "r") as f:
+            for row in csv.DictReader(f):
+                pid = int(row["id"])
+                if pid in existing_ids:
+                    continue
+                symptoms = row["symptoms"].split("|")
+                clinic.add_person(Patient(pid, row["name"], int(row["age"]), symptoms))
+                existing_ids.add(pid)
+        print_info("Previous patient records loaded.")
+
+    if os.path.exists(APPOINTMENTS_FILE):
+        existing_pids = {a.patient.person_id for a in clinic.appointments}
+        with open(APPOINTMENTS_FILE, "r") as f:
+            for row in csv.DictReader(f):
+                pid = int(row["patient_id"])
+                if pid in existing_pids:
+                    continue
+                patient = next(
+                    (p for p in clinic.get_patients() if p.person_id == pid), None
+                )
+                if patient is None:
+                    continue
+
+                # FIX: look up the REAL doctor object already in clinic staff
+                # don't create a new Doctor object from CSV
+                doctor = next(
+                    (
+                        d
+                        for d in clinic.get_doctors()
+                        if d.person_id == int(row["doctor_id"])
+                    ),
+                    None,
+                )
+                # only fallback to creating new if doctor truly not found (edge case)
+                if doctor is None:
+                    doctor = Doctor(
+                        int(row["doctor_id"]),
+                        row["doctor_name"],
+                        0,
+                        row["doctor_specialty"],
+                    )
+
+                time_slot = datetime.strptime(row["time_slot"], "%Y-%m-%d %H:%M")
+                urgent = row["urgent"] == "True"
+                clinic.schedule_appointment(
+                    Appointment(doctor, patient, time_slot, urgent)
+                )
+        print_info("Previous appointment records loaded.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -447,7 +550,7 @@ def run() -> None:
     clinic.add_person(Receptionist(301, "Mina Ali", 28, "Morning"))
 
     print_header(f"Welcome to {clinic.name}")
-
+    load_data(clinic)  # load any previously saved patient records
     clinic.show_staff()  # POLYMORPHISM: each person introduces differently
     clinic.show_appointments()  # OPERATOR OVERLOADING: sorted by urgency
 
@@ -462,7 +565,7 @@ def run() -> None:
             break
         clinic.register_new_patient()
         clinic.show_appointments()  # show updated queue after each registration
-
+    save_data(clinic)  # FILE I/O: save everything before exit
     print_header("Thank you for visiting SmartCare Clinic. Goodbye!")
 
 

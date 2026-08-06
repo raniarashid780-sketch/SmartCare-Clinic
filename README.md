@@ -2,6 +2,10 @@
 
 A terminal-based clinic management system built in Python as a 2nd semester final project for BS Artificial Intelligence at Ghazi University.
 
+## Screenshot
+
+![SmartCare-Clinic — showing a dry-run preview](assets/demo.png)
+
 ## Project Overview
 This project simulates a simple clinic workflow where users can:
 - register patients
@@ -38,7 +42,7 @@ pip install -r requirements.txt
 From the project folder, run:
 
 ```bash
-python "Smart_Clinic_Appointment_&_Diagnosis_System_01.py"
+python "smart_clinic.py"
 ```
 
 ## Files

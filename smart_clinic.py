@@ -15,9 +15,9 @@ OOP Concepts Demonstrated:
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from datetime import datetime
-import os
-import csv
 from colorama import init, Fore, Style
+from db import get_connection
+from queries import add_patient, add_symptom, add_appointment, get_all_doctors, get_all_patients, get_patient_symptoms, get_all_appointments, insert_default_doctors
 
 # initialise colorama – makes colors work on Windows too
 init(autoreset=True)
@@ -311,10 +311,6 @@ class Clinic:
     def get_doctors(self) -> list[Doctor]:
         return [p for p in self.people if isinstance(p, Doctor)]
 
-    def next_patient_id(self) -> int:
-        existing = [p.person_id for p in self.get_patients()]
-        return max(existing, default=100) + 1
-
     def assign_doctor(self, service: str, symptoms: list[str]) -> Doctor | None:
         doctors = self.get_doctors()
         # cardiac symptoms always go to Cardiology
@@ -388,148 +384,71 @@ class Clinic:
         if not symptoms:
             symptoms = ["unspecified"]
 
-        # create patient object with auto-generated ID
-        pid = self.next_patient_id()
-        patient = Patient(pid, name, age, symptoms)
-        self.add_person(patient)
-
-        print_success(f"\n  Patient registered. Auto-assigned ID: {pid}")
-        print_info(patient.introduce())  # POLYMORPHISM
-
-        # diagnosis engine decides service and urgency – NOT the patient
-        service = self.engine.diagnose(symptoms)
-        urgent = self.engine.is_urgent(
-            symptoms
-        )  # ENCAPSULATION: private rules used here
-
-        doctor = self.assign_doctor(service, symptoms)
-        if doctor is None:
-            print_urgent("  No doctor available right now.")
+        # Save patient to database and get the database-generated ID
+        conn = get_connection()
+        if not conn:
+            print_urgent("  Database connection failed!")
             return
 
-        time_slot = datetime.now().replace(second=0, microsecond=0)
-        appt = Appointment(doctor, patient, time_slot, urgent)
-        self.schedule_appointment(appt)  # auto-sorted via __gt__ / __lt__
+        try:
+            with conn:
+                with conn.cursor() as cur:
+                    # Insert patient into database
+                    pid = add_patient(cur, name, age)
 
-        print_section("Diagnosis & Treatment")
-        if urgent:
-            print_urgent("  ! URGENT case flagged by system based on symptoms!")
-        print_info(f"  Assigned Doctor : Dr. {doctor.name} ({doctor.specialty})")
-        print_info(f"  Diagnosis       : {service}")
+                    # Insert each symptom into database
+                    for s in symptoms:
+                        add_symptom(cur, pid, s)
 
-        treatment = self.suggest_treatment(patient)
-        if treatment:
-            print_info(f"  Treatment Type  : {treatment.__class__.__name__}")
-            print_info(f"  Action          : {treatment.apply()}")  # POLYMORPHISM
-        else:
-            print_info("  Action          : General Checkup recommended.")
+                    # Create patient object with database ID
+                    patient = Patient(pid, name, age, symptoms)
 
-        print_section("Bill")
-        bill = Billing(patient, service, urgent=urgent)
-        if urgent:
-            print_urgent(str(bill))
-        else:
-            print_success(str(bill))
+                    # diagnosis engine decides service and urgency – NOT the patient
+                    service = self.engine.diagnose(symptoms)
+                    urgent = self.engine.is_urgent(
+                        symptoms
+                    )  # ENCAPSULATION: private rules used here
 
-# ─────────────────────────────────────────────────────────────────────────────
-# FILE I/O
-# save_data() – writes patients and appointments to CSV files on disk
-# load_data() – reads them back at startup so data is never lost
-# ─────────────────────────────────────────────────────────────────────────────
+                    doctor = self.assign_doctor(service, symptoms)
+                    if doctor is None:
+                        raise ValueError("No doctor available right now.")
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PATIENTS_FILE = os.path.join(BASE_DIR, "patients.csv")
-APPOINTMENTS_FILE = os.path.join(BASE_DIR, "appointments.csv")
+                    time_slot = datetime.now().replace(second=0, microsecond=0)
 
+                    # Build billing BEFORE inserting appointment, so fee reaches the DB
+                    bill = Billing(patient, service, urgent=urgent)
+                    fee = bill.get_total()
 
-def save_data(clinic: Clinic) -> None:
-    # save patients
-    with open(PATIENTS_FILE, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(["id", "name", "age", "symptoms"])
-        for p in clinic.get_patients():
-            # list ["fever","cough"] → "fever|cough" to fit one CSV cell
-            writer.writerow([p.person_id, p.name, p.age, "|".join(p.get_symptoms())])
+                    # Add appointment to database with calculated fee
+                    appt_id = add_appointment(cur, pid, doctor.person_id, time_slot, urgent, service, fee)
+                    appt = Appointment(doctor, patient, time_slot, urgent)
+                    self.schedule_appointment(appt)  # auto-sorted via __gt__ / __lt__
 
-    # save appointments
-    with open(APPOINTMENTS_FILE, "w", newline="") as f:
-        writer = csv.writer(f)
-        writer.writerow(
-            [
-                "patient_id",
-                "doctor_id",
-                "doctor_name",
-                "doctor_specialty",
-                "time_slot",
-                "urgent",
-            ]
-        )
-        for a in clinic.appointments:
-            writer.writerow(
-                [
-                    a.patient.person_id,
-                    a.doctor.person_id,
-                    a.doctor.name,
-                    a.doctor.specialty,
-                    a.time_slot.strftime("%Y-%m-%d %H:%M"),
-                    a.urgent,
-                ]
-            )
+                    # Only add to in-memory after DB transaction succeeds
+                    self.add_person(patient)
 
-    print_success("\n  Records saved to patients.csv and appointments.csv")
+                    print_success(f"\n  Patient registered. Auto-assigned ID: {pid}")
+                    print_info(patient.introduce())  # POLYMORPHISM
+
+                    treatment = self.suggest_treatment(patient)
+                    if treatment:
+                        print_info(f"  Treatment Type  : {treatment.__class__.__name__}")
+                        print_info(f"  Action          : {treatment.apply()}")  # POLYMORPHISM
+                    else:
+                        print_info("  Action          : General Checkup recommended.")
+
+                    print_section("Bill")
+                    if urgent:
+                        print_urgent(str(bill))
+                    else:
+                        print_success(str(bill))
+        except ValueError as e:
+            print_urgent(f"  {e}")
+            return
+        finally:
+            conn.close()
 
 
-def load_data(clinic: Clinic) -> None:
-    if os.path.exists(PATIENTS_FILE):
-        existing_ids = {p.person_id for p in clinic.get_patients()}
-        with open(PATIENTS_FILE, "r") as f:
-            for row in csv.DictReader(f):
-                pid = int(row["id"])
-                if pid in existing_ids:
-                    continue
-                symptoms = row["symptoms"].split("|")
-                clinic.add_person(Patient(pid, row["name"], int(row["age"]), symptoms))
-                existing_ids.add(pid)
-        print_info("Previous patient records loaded.")
-
-    if os.path.exists(APPOINTMENTS_FILE):
-        existing_pids = {a.patient.person_id for a in clinic.appointments}
-        with open(APPOINTMENTS_FILE, "r") as f:
-            for row in csv.DictReader(f):
-                pid = int(row["patient_id"])
-                if pid in existing_pids:
-                    continue
-                patient = next(
-                    (p for p in clinic.get_patients() if p.person_id == pid), None
-                )
-                if patient is None:
-                    continue
-
-                # FIX: look up the REAL doctor object already in clinic staff
-                # don't create a new Doctor object from CSV
-                doctor = next(
-                    (
-                        d
-                        for d in clinic.get_doctors()
-                        if d.person_id == int(row["doctor_id"])
-                    ),
-                    None,
-                )
-                # only fallback to creating new if doctor truly not found (edge case)
-                if doctor is None:
-                    doctor = Doctor(
-                        int(row["doctor_id"]),
-                        row["doctor_name"],
-                        0,
-                        row["doctor_specialty"],
-                    )
-
-                time_slot = datetime.strptime(row["time_slot"], "%Y-%m-%d %H:%M")
-                urgent = row["urgent"] == "True"
-                clinic.schedule_appointment(
-                    Appointment(doctor, patient, time_slot, urgent)
-                )
-        print_info("Previous appointment records loaded.")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -542,15 +461,38 @@ def load_data(clinic: Clinic) -> None:
 def run() -> None:
     clinic = Clinic("SmartCare Clinic")
 
-    # staff are pre-loaded – they are fixed clinic employees
-    clinic.add_person(Doctor(201, "Ayesha Khan", 45, "Orthopedics"))
-    clinic.add_person(Doctor(202, "Rohan Mehta", 39, "Internal Medicine"))
-    clinic.add_person(Doctor(203, "Ali Khan", 50, "Cardiology"))
-    clinic.add_person(Doctor(204, "Muhammad Hamza", 43, "Psychology"))
+    # Load staff (doctors) from database
+    db_doctors = get_all_doctors()
+    for doc_id, name, age, specialty in db_doctors:
+        clinic.add_person(Doctor(doc_id, name, age, specialty))
+
+    # If no doctors in DB, insert defaults
+    if not clinic.get_doctors():
+        insert_default_doctors()
+        db_doctors = get_all_doctors()  # Reload after insert
+        for doc_id, name, age, specialty in db_doctors:
+            clinic.add_person(Doctor(doc_id, name, age, specialty))
+
+    # Add receptionists (always fixed for this session)
     clinic.add_person(Receptionist(301, "Mina Ali", 28, "Morning"))
 
+    # Restore patient history from database
+    db_patients = get_all_patients()
+    for pid, name, age in db_patients:
+        symptoms = get_patient_symptoms(pid)
+        if not symptoms:
+            symptoms = ["unspecified"]
+        clinic.add_person(Patient(pid, name, age, symptoms))
+
+    # Restore appointment history from database
+    db_appointments = get_all_appointments()
+    for appt_id, patient_id, doctor_id, time_slot, urgent, diagnosis, fee in db_appointments:
+        patient = next((p for p in clinic.get_patients() if p.person_id == patient_id), None)
+        doctor = next((d for d in clinic.get_doctors() if d.person_id == doctor_id), None)
+        if patient and doctor:
+            clinic.schedule_appointment(Appointment(doctor, patient, time_slot, urgent))
+
     print_header(f"Welcome to {clinic.name}")
-    load_data(clinic)  # load any previously saved patient records
     clinic.show_staff()  # POLYMORPHISM: each person introduces differently
     clinic.show_appointments()  # OPERATOR OVERLOADING: sorted by urgency
 
@@ -565,7 +507,6 @@ def run() -> None:
             break
         clinic.register_new_patient()
         clinic.show_appointments()  # show updated queue after each registration
-    save_data(clinic)  # FILE I/O: save everything before exit
     print_header("Thank you for visiting SmartCare Clinic. Goodbye!")
 
 

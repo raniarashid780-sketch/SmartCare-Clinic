@@ -56,3 +56,23 @@ def create_appointment(db: Session, appointment_in: AppointmentCreate) -> Appoin
     db.commit()
     db.refresh(appointment)
     return appointment
+
+def create_doctor(db: Session, doctor_in: DoctorCreate) -> Doctor:
+    doctor = Doctor(
+        name=doctor_in.name,
+        age=doctor_in.age,
+        specialization=doctor_in.specialization,
+        experience_yrs=doctor_in.experience_yrs,
+        phone=doctor_in.phone
+    )
+    db.add(doctor)
+    db.commit()
+    db.refresh(doctor)
+    return doctor
+
+def get_doctor(db: Session, doctor_id: int) -> Doctor | None:
+    return db.get(Doctor, doctor_id)
+
+
+def list_doctors(db: Session) -> list[Doctor]:
+    return db.execute(select(Doctor)).scalars().all()

@@ -46,6 +46,7 @@ class DoctorOut(BaseModel):
     age: int
     specialization: str
     experience_yrs: int
+    phone: str | None
     model_config = {
         "from_attributes": True
     }

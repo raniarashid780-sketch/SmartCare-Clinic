@@ -9,14 +9,20 @@ class PatientCreate(BaseModel):
         if not v.strip():
             raise ValueError("name cannot be blank or whitespace-only")
         return v
-    age: int = Field(..., gt=0, lt=120, description="Age should be between 1 and 120", json_schema_extra={"example": 30})
+    age: int = Field(..., gt=0, lt=150, description="Age should be between 1 and 150", json_schema_extra={"example": 30})
     symptoms: list[str] = Field(..., description="List of symptoms", json_schema_extra={"example": "Fever, Cough"})
+
+class SymptomOut(BaseModel):
+    id: int
+    symptom: str
+    model_config = {"from_attributes": True}
+
 
 class PatientOut(BaseModel):
     id: int
     name: str
     age: int
-    symptoms: list[str]
+    symptoms: list[SymptomOut]
     model_config = {
         "from_attributes": True
     }
@@ -31,14 +37,15 @@ class DoctorCreate(BaseModel):
         return v
     age: int = Field(..., gt=0, lt=120, description="Age should be between 1 and 120", json_schema_extra={"example": 45})
     specialization: str = Field(..., min_length=2, max_length=50, description="Doctor's specialization should be between 2 and 50 characters", json_schema_extra={"example": "Cardiology"})
-    experience_years: int = Field(..., gt=0, description="Years of experience should be a positive integer", json_schema_extra={"example": 10})
+    experience_yrs: int = Field(..., gt=0, description="Years of experience should be a positive integer", json_schema_extra={"example": 10})
+    phone: str | None = Field(None, json_schema_extra={"example": "555-0100"})
 
 class DoctorOut(BaseModel):
     id: int
     name: str
     age: int
     specialization: str
-    experience_years: int
+    experience_yrs: int
     model_config = {
         "from_attributes": True
     }

@@ -1,132 +1,105 @@
-# SmartCare Clinic — Appointment & Diagnosis System
+# 🏥 SmartCare Clinic
 
-A terminal-based clinic management system built in Python with a PostgreSQL backend. Originally built as a 2nd semester final project for BS Artificial Intelligence at Ghazi University. Upgraded with a normalized relational database layer using psycopg2.
+A clinic management system that started as a university OOP project and grew into a real, database-backed application — with both a terminal interface and a full REST API.
 
----
+## The Problem
 
-## What It Does
+Small clinics often run on paper or spreadsheets — patient records get lost, doctors get double-booked, and there's no consistent way to flag urgent cases. SmartCare Clinic solves this with a structured, rule-based system: patients are logged with their symptoms, urgency is detected automatically, doctors are assigned by specialty, and bills are generated — all backed by a real PostgreSQL database that never loses data between sessions.
 
-Clinic staff can register patients, assign doctors by specialization, log diagnoses, and generate bills — all from the terminal. Patient and visit data persists in a PostgreSQL database with referential integrity enforced at the schema level. Data survives between sessions — no CSV, no data loss.
+## Two Ways to Use It
 
----
+| | |
+|---|---|
+| 🖥️ **Terminal App** | The original interactive CLI — register patients, book appointments, generate bills |
+| 🌐 **REST API** | The same logic, exposed over HTTP with live interactive docs at `/docs` |
+
+Both talk to the same database and share the same diagnosis/billing logic — nothing is duplicated between them.
+
+## What It Actually Does
+
+- 🩺 **Symptom-based diagnosis** — routes patients to Surgery, Medication, Therapy, or a General Checkup
+- 🚨 **Automatic urgency detection** — chest pain, fractures, and similar symptoms get flagged and surcharged
+- 👨‍⚕️ **Doctor assignment** by specialization
+- 🚫 **No double-booking** — enforced at the database level, not just in code
+- 💳 **Billing**, with urgent-case surcharges applied automatically
+- 🗄️ **Real persistence** — PostgreSQL, with versioned schema migrations (Alembic), not drop-and-recreate
+
+## Tech Stack
+
+**Terminal app:** Python · PostgreSQL · psycopg2 · python-dotenv · colorama
+**API:** FastAPI · SQLAlchemy 2.0 · Alembic · Pydantic · Uvicorn
+
+## Database Schema
+```
+doctors → id, name, age, specialization, phone (unique), experience_yrs
+patients → id, name, age
+symptoms → id, patient_id → patients, symptom
+appointments → id, patient_id, doctor_id, time_slot, urgent, diagnosis, fee
+UNIQUE(doctor_id, time_slot) — no double-booking, ever
+```
+
+Foreign keys protect data integrity: a patient's appointment history can't be silently deleted, and a doctor can never be booked twice for the same slot — both guaranteed by the database itself.
+
+## OOP Concepts Applied
+
+Classes & objects · Inheritance · Polymorphism · Encapsulation · Abstraction · Operator overloading — see `smart_clinic.py` for the full implementation (`Patient`, `Doctor`, `Billing`, `Diagnosis`, and their relationships).
+
 ## Screenshot
 
 ![SmartCare-Clinic — showing a dry-run preview](assets/demo.png)
 
----
-## Tech Stack
-
-| Tool | Purpose |
-|---|---|
-| Python 3.x | Core language |
-| PostgreSQL 16 | Relational database backend |
-| psycopg2 | Python-to-PostgreSQL driver |
-| python-dotenv | Credentials via environment variables |
-| colorama | Colored terminal output |
-
----
-
-## OOP Concepts Covered
-
-- **Classes & Objects** — Patient, Doctor, Billing are all classes
-- **Inheritance** — Patient, Doctor, Receptionist inherit from Person
-- **Polymorphism** — `introduce()` and `apply()` behave differently per subclass
-- **Encapsulation** — Private attributes `__symptoms` and `__rules` accessed via getters only
-- **Abstraction** — Person and Treatment are abstract classes using ABC
-- **Operator Overloading** — `__lt__`, `__gt__`, `__str__` on Appointment for sorting and display
-
----
-
-## Database Schema
-
-Three normalized tables (3NF):
-
-```
-doctors   (id, name, specialization, phone, experience_yrs, created_at)
-patients  (id, name, age, phone, created_at)
-visits    (id, patient_id → patients, doctor_id → doctors, diagnosis, visit_date, fee)
-```
-
-Foreign keys enforce referential integrity — no orphan visits, no missing references.
-
----
-
-## Project Structure
-
-```
-SmartCare-Clinic/
-├── Smart_Clinic_Appointment_&_Diagnosis_System_01.py
-├── db.py              # PostgreSQL connection layer
-├── queries.py         # All SQL operations (parameterized)
-├── schema.sql         # Run once to create tables
-├── .env               # Your credentials (not committed)
-├── .env.example       # Template for other developers
-├── requirements.txt
-└── .gitignore
-```
-
----
-
-## Setup
-
-### 1. Clone the repo
+## Getting Started
 
 ```bash
 git clone https://github.com/raniarashid780-sketch/SmartCare-Clinic.git
 cd SmartCare-Clinic
-```
-
-### 2. Install dependencies
-
-```bash
 pip install -r requirements.txt
-```
 
-### 3. Set up PostgreSQL
-
-```bash
+# Set up the database
 psql -U postgres -c "CREATE DATABASE smartcare;"
-psql -U postgres -d smartcare -f schema.sql
-```
+alembic upgrade head
 
-### 4. Configure environment variables
-
-```bash
+# Configure credentials
 cp .env.example .env
+# edit .env with your DB_HOST / DB_PORT / DB_NAME / DB_USER / DB_PASSWORD
 ```
 
-Edit `.env` with your credentials:
-
-```
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=smartcare
-DB_USER=postgres
-DB_PASSWORD=your_password_here
-```
-
-### 5. Run
-
+**Run the terminal app:**
 ```bash
-python "Smart_Clinic_Appointment_&_Diagnosis_System_01.py"
+python smart_clinic.py
 ```
 
----
+**Run the API:**
+```bash
+python -m uvicorn api.main:app --reload
+```
+Then open `http://127.0.0.1:8000/docs`.
 
-## Features
+## Project Structure
+```
+SmartCare-Clinic/
+├── smart_clinic.py # Terminal app
+├── api/ # REST API (SQLAlchemy + FastAPI)
+│ ├── models.py, schemas.py, crud.py
+│ ├── diagnosis_service.py
+│ └── main.py
+├── alembic/ # Database migrations
+└── schema.sql # Original schema (kept for history; Alembic is the source of truth now)
+```
+## About This Project
 
-- Auto patient ID generation
-- Symptom-based diagnosis engine
-- Urgency detection (chest pain, fracture, etc.)
-- Doctor assignment by specialization
-- Billing with urgent surcharge
-- Colored terminal output
-- PostgreSQL persistence — data survives between sessions
-- Parameterized queries — SQL injection protected
+Built solo, in stages:
 
----
+1. **The original OOP terminal app** — patients, doctors, diagnosis logic, billing — with CSV-based persistence.
+2. **Migrated to PostgreSQL** — replaced CSV with a real relational database, schema designed by hand.
+3. **Rebuilt the database layer with SQLAlchemy + Alembic** — real ORM models, versioned migrations instead of drop-and-recreate.
+4. **Added a REST API with FastAPI** — the same diagnosis/billing logic, now exposed over HTTP with live interactive docs.
 
-## Built By
+## License
 
-Rania Rashid — BS Artificial Intelligence, Ghazi University DG Khan
+See [LICENSE](LICENSE) for terms.
+
+## Author
+
+**Rania Rashid** — BS Artificial Intelligence, Ghazi University DG Khan
 GitHub: [@raniarashid780-sketch](https://github.com/raniarashid780-sketch)

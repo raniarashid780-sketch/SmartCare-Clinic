@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import select
+from api.diagnosis_service import compute_urgency_and_fee
 from api.models import Appointment, Doctor, Patient, Symptom
 from api.schemas import DoctorCreate, PatientCreate, AppointmentCreate
 
@@ -41,15 +42,14 @@ def create_appointment(db: Session, appointment_in: AppointmentCreate) -> Appoin
     if existing_appointment:
         raise DoubleBookingError(appointment_in.doctor_id, appointment_in.time_slot)
 
-    # TODO: replace with real diagnosis_service.compute_urgency_and_fee(patient)
-    urgent = False
-    fee = 50.00
+    urgent, diagnosis, fee = compute_urgency_and_fee(patient)
 
     appointment = Appointment(
         patient=patient,
         doctor=doctor,
         time_slot=appointment_in.time_slot,
         urgent=urgent,
+        diagnosis=diagnosis,
         fee=fee,
     )
     db.add(appointment)

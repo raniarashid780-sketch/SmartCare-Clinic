@@ -45,11 +45,9 @@ class DoctorOut(BaseModel):
     name: str
     age: int
     specialization: str
-    experience_yrs: int
+    experience_yrs: int | None
     phone: str | None
-    model_config = {
-        "from_attributes": True
-    }
+    model_config = {"from_attributes": True}
 
 class AppointmentCreate(BaseModel):
     patient_id: int = Field(..., description="ID of the patient", json_schema_extra={"example": 1})

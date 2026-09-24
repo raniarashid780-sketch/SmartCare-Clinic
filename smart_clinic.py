@@ -179,10 +179,10 @@ class Appointment:
         self.urgent = urgent
 
     def __gt__(self, other: Appointment) -> bool:
-        # self is "greater" (higher priority) if self is urgent and other is not
+
         if self.urgent != other.urgent:
-            return self.urgent  # True > False, so urgent wins
-        # if same urgency, earlier time slot = higher priority
+            return self.urgent
+
         return self.time_slot < other.time_slot
 
     def __lt__(self, other: Appointment) -> bool:
@@ -210,14 +210,13 @@ class Appointment:
 
 class DiagnosisEngine:
     def __init__(self) -> None:
-        # YOUR IDEA: treatment → list of symptoms (inverted structure)
-        # cleaner, scalable, no repetition
+
         self.__rules = {
             "Surgery": ["fracture", "broken bone"],
             "Medication": ["fever", "cough", "infection", "chest pain", "heart pain"],
             "Therapy": ["stress", "anxiety", "insomnia"],
         }
-        # system decides urgency based on these – patient does NOT choose
+
         self.__urgent_symptoms = {"chest pain", "heart pain", "fracture", "broken bone"}
 
     def diagnose(self, symptoms: list[str]) -> str:

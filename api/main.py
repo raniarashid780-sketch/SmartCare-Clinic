@@ -6,7 +6,7 @@ from api.database import get_db
 from api.crud import DoubleBookingError
 from api.schemas import PatientCreate, DoctorCreate, DoctorOut, AppointmentCreate, PatientOut, AppointmentOut
 
-app = FastAPI()
+app = FastAPI(title="SmartCare Clinic API")
 
 @app.post("/patients/", response_model=PatientOut, status_code=201)
 def create_patient(patient_in: PatientCreate, db: Session = Depends(get_db)):
@@ -28,7 +28,7 @@ def list_patients(db: Session = Depends(get_db)):
 def create_doctor(doctor_in: DoctorCreate, db: Session = Depends(get_db)):
     return crud.create_doctor(db, doctor_in)
 
-@app.get("/doctor/{doctor_id}", response_model=DoctorOut)
+@app.get("/doctors/{doctor_id}", response_model=DoctorOut)
 def get_doctor(doctor_id: int, db: Session = Depends(get_db)):
     doctor = crud.get_doctor(db, doctor_id)
     if not doctor:

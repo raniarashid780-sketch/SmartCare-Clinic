@@ -46,7 +46,9 @@ Classes & objects · Inheritance · Polymorphism · Encapsulation · Abstraction
 
 ## Screenshot
 
-![SmartCare-Clinic — showing a dry-run preview](assets/demo.png)
+![SmartCare terminal app](assets/demo.png)
+
+![SmartCare API docs page](assets/api_docs.png)
 
 ## Getting Started
 

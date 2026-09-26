@@ -77,6 +77,16 @@ python -m uvicorn api.main:app --reload
 ```
 Then open `http://127.0.0.1:8000/docs`.
 
+## Testing
+
+Run the test suite with:
+
+```bash
+pytest
+```
+
+The current regression test verifies that a doctor cannot be booked for two appointments at the same time, while appointments at different times remain valid. It uses an in-memory SQLite database, so it does not require PostgreSQL.
+
 ## Project Structure
 ```
 SmartCare-Clinic/
@@ -86,6 +96,8 @@ SmartCare-Clinic/
 │ ├── diagnosis_service.py
 │ └── main.py
 ├── alembic/ # Database migrations
+├── tests/ # Automated tests
+│ └── test_double_booking.py
 └── schema.sql # Original schema (kept for history; Alembic is the source of truth now)
 ```
 ## About This Project

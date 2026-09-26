@@ -26,11 +26,11 @@ def list_patients(db: Session) -> list[Patient]:
     return db.execute(select(Patient)).scalars().all()
 
 def create_appointment(db: Session, appointment_in: AppointmentCreate) -> Appointment:
-    patient = db.get(Patient, appointment_in.patient_id)  # lowercase - not shadowing the class
+    patient = db.get(Patient, appointment_in.patient_id)  
     doctor = db.get(Doctor, appointment_in.doctor_id)
 
     if patient is None or doctor is None:
-        raise ValueError("patient or doctor does not exist")  # real gap you hadn't handled
+        raise ValueError("patient or doctor does not exist")  
 
     existing_appointment = db.execute(
         select(Appointment).where(

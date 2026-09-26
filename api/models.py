@@ -63,7 +63,7 @@ class Appointment(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     patient_id: Mapped[int] = mapped_column(
-        ForeignKey("patients.id"), nullable=False  # no ondelete -> blocks delete, matches your decision
+        ForeignKey("patients.id"), nullable=False
     )
     doctor_id: Mapped[int] = mapped_column(ForeignKey("doctors.id"), nullable=False)
     time_slot: Mapped[datetime] = mapped_column(DateTime, nullable=False)

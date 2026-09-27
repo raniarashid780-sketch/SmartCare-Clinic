@@ -28,6 +28,7 @@ Both talk to the same database and share the same diagnosis/billing logic — no
 
 **Terminal app:** Python · PostgreSQL · psycopg2 · python-dotenv · colorama
 **API:** FastAPI · SQLAlchemy 2.0 · Alembic · Pydantic · Uvicorn
+**Infra:** Docker · Docker Compose
 
 ## Database Schema
 ```
@@ -51,6 +52,19 @@ Classes & objects · Inheritance · Polymorphism · Encapsulation · Abstraction
 ![SmartCare API docs page](assets/api_docs.png)
 
 ## Getting Started
+
+### Option 1 — Docker (recommended, no local Postgres needed)
+
+```bash
+git clone https://github.com/raniarashid780-sketch/SmartCare-Clinic.git
+cd SmartCare-Clinic
+cp .env.example .env
+# edit .env with your own values — these become the container's Postgres credentials
+docker compose up --build
+```
+API available at `http://localhost:8000/docs`. Migrations run automatically on startup — no manual `alembic upgrade head` needed. Postgres data persists across restarts via a Docker volume.
+
+### Option 2 — Manual setup (native Postgres, no Docker)
 
 ```bash
 git clone https://github.com/raniarashid780-sketch/SmartCare-Clinic.git
@@ -90,15 +104,18 @@ The current regression test verifies that a doctor cannot be booked for two appo
 ## Project Structure
 ```
 SmartCare-Clinic/
-├── smart_clinic.py # Terminal app
-├── api/ # REST API (SQLAlchemy + FastAPI)
-│ ├── models.py, schemas.py, crud.py
-│ ├── diagnosis_service.py
-│ └── main.py
-├── alembic/ # Database migrations
-├── tests/ # Automated tests
-│ └── test_double_booking.py
-└── schema.sql # Original schema (kept for history; Alembic is the source of truth now)
+├── smart_clinic.py       # Terminal app
+├── api/                  # REST API (SQLAlchemy + FastAPI)
+│   ├── models.py, schemas.py, crud.py
+│   ├── diagnosis_service.py
+│   └── main.py
+├── alembic/               # Database migrations
+├── tests/                 # Automated tests
+│   └── test_double_booking.py
+├── Dockerfile
+├── docker-compose.yml
+├── .dockerignore
+└── schema.sql             # Original schema (kept for history; Alembic is the source of truth now)
 ```
 ## About This Project
 
@@ -108,6 +125,7 @@ Built solo, in stages:
 2. **Migrated to PostgreSQL** — replaced CSV with a real relational database, schema designed by hand.
 3. **Rebuilt the database layer with SQLAlchemy + Alembic** — real ORM models, versioned migrations instead of drop-and-recreate.
 4. **Added a REST API with FastAPI** — the same diagnosis/billing logic, now exposed over HTTP with live interactive docs.
+5. **Containerized with Docker** — API and Postgres now run as a two-container setup via Docker Compose, with automatic migrations on startup and persistent data via a Docker volume — no local Postgres install required to run the project.
 
 ## License
 

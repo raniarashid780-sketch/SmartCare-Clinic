@@ -10,7 +10,7 @@ class PatientCreate(BaseModel):
             raise ValueError("name cannot be blank or whitespace-only")
         return v
     age: int = Field(..., gt=0, lt=150, description="Age should be between 1 and 150", json_schema_extra={"example": 30})
-    symptoms: list[str] = Field(..., description="List of symptoms", json_schema_extra={"example": "Fever, Cough"})
+    symptoms: list[str] = Field(..., description="List of symptoms", json_schema_extra={"example": ["Fever", "Cough"]})
 
 class SymptomOut(BaseModel):
     id: int
